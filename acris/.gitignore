@@ -1,0 +1,9 @@
+backend/node_modules/
+frontend/node_modules/
+frontend/dist/
+reports/
+uploads/
+chroma_db/
+__pycache__/
+*.pyc
+.DS_Store
