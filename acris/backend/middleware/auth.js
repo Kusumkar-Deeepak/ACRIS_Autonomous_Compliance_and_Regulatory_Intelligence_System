@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import config from "../config/index.js";
 
 export default function authMiddleware(req, res, next) {
   const header = req.headers.authorization || "";
@@ -9,10 +10,19 @@ export default function authMiddleware(req, res, next) {
   }
 
   try {
-    req.user = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your_jwt_secret_here",
-    );
+    const decoded = jwt.verify(token, config.jwtSecret);
+    req.user = {
+      userId: decoded.userId || null,
+      organizationId: decoded.organizationId || null,
+      role: decoded.role || null,
+      email: decoded.email || null,
+      name: decoded.name || decoded.email || "User",
+    };
+
+    if (!req.user.userId || !req.user.organizationId || !req.user.role) {
+      return res.status(401).json({ message: "Invalid auth token" });
+    }
+
     return next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid auth token" });

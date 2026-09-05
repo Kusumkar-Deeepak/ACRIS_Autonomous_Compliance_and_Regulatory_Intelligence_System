@@ -2,6 +2,12 @@ import mongoose from "mongoose";
 
 const reportSchema = new mongoose.Schema(
   {
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Organization",
+      index: true,
+      default: null,
+    },
     regulation_ids: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Regulation" },
     ],
@@ -19,5 +25,7 @@ const reportSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+reportSchema.index({ organizationId: 1, generated_at: -1 });
 
 export default mongoose.model("Report", reportSchema);

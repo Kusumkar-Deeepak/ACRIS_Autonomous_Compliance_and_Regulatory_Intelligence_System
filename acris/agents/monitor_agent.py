@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from shared import emit_error, emit_json, get_db, normalize_text, read_input_json
+from shared import emit_error, emit_json, get_db, normalize_text, object_id, read_input_json
 
 
 def main():
@@ -9,6 +9,7 @@ def main():
     pdf_path = payload.get("pdf_path")
     source = payload.get("source")
     title = payload.get("title")
+    organization_id = payload.get("organization_id")
 
     if not pdf_path:
         emit_error("pdf_path is required")
@@ -16,15 +17,18 @@ def main():
         emit_error("PDF file does not exist", extra={"pdf_path": pdf_path})
     if not source or not title:
         emit_error("source and title are required")
+    if not organization_id:
+        emit_error("organization_id is required")
 
     db = get_db()
     latest = db.regulations.find_one(
-        {"source": source, "title": title},
+        {"organizationId": object_id(organization_id), "source": source, "title": title},
         sort=[("version", -1)],
     )
     version = (latest.get("version", 0) + 1) if latest else 1
 
     document = {
+        "organizationId": object_id(organization_id),
         "source": source,
         "title": normalize_text(title),
         "published_date": datetime.now(timezone.utc),

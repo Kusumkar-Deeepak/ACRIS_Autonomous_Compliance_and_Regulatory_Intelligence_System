@@ -2,7 +2,6 @@ from pathlib import Path
 
 import fitz
 
-
 def extract_text(pdf_path: str, output_path: str = "pdf_content.txt"):
     document = fitz.open(pdf_path)
     pages = []

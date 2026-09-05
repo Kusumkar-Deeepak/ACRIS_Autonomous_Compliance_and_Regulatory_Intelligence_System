@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios.js";
+import { useAuth } from "../app/AuthProvider.jsx";
 import UploadPanel from "../components/UploadPanel.jsx";
 import AgentTimeline from "../components/AgentTimeline.jsx";
 import DiffViewer from "../components/DiffViewer.jsx";
@@ -42,7 +43,8 @@ function statusTone(status) {
   return "bg-slate-500/15 text-slate-300 border-white/10";
 }
 
-function Dashboard({ user, onLogout }) {
+function Dashboard() {
+  const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const [selectedRegulationId, setSelectedRegulationId] = useState("");
 
@@ -171,7 +173,7 @@ function Dashboard({ user, onLogout }) {
               {user?.name || "Compliance Admin"}
             </div>
           </div>
-          <button className="acris-button-secondary" onClick={onLogout}>
+          <button className="acris-button-secondary" onClick={logout}>
             Log out
           </button>
         </div>

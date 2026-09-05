@@ -6,12 +6,25 @@ from shared import emit_error, emit_json, get_db, object_id, normalize_text, rea
 
 
 def extract_pdf_text(pdf_path: str) -> tuple[str, int]:
-    doc = fitz.open(pdf_path)
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception as e:
+        emit_error(f"Failed to open PDF (file may be corrupted or password-protected): {str(e)}")
+
+    if len(doc) > 100:
+        emit_error("PDF exceeds maximum allowed page count (100 pages).")
+
     page_texts = []
+    import re
     for page in doc:
         text = page.get_text("text") or ""
-        page_texts.append(normalize_text(text))
-    combined = "\n\n".join(text for text in page_texts if text)
+        # Clean up horizontal whitespace but preserve paragraphs/newlines
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        if text.strip():
+            page_texts.append(text.strip())
+
+    combined = "\n\n".join(page_texts)
     return combined.strip(), len(doc)
 
 

@@ -1,0 +1,12 @@
+{
+  "name": "acris-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix acris/backend run dev",
+    "dev:frontend": "npm --prefix acris/frontend run dev",
+    "build": "npm --prefix acris/frontend run build",
+    "lint": "npm --prefix acris/backend run lint",
+    "test": "npm --prefix acris/backend run test"
+  }
+}

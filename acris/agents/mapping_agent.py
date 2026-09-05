@@ -40,7 +40,7 @@ def main():
 
         for index, doc_id in enumerate(ids):
             score = relevance(distances[index] if index < len(distances) else None)
-            if score < 0.75:
+            if score < 0.50:
                 continue
 
             metadata = metadatas[index] if index < len(metadatas) else {}
@@ -57,7 +57,13 @@ def main():
     mappings_output = []
 
     for doc_id, entry in aggregate.items():
-        doc = db.companydocs.find_one({"embedding_id": doc_id}) or db.companydocs.find_one({"_id": object_id(doc_id)})
+        doc = db.companydocs.find_one({
+            "embedding_id": doc_id,
+            "organizationId": regulation.get("organizationId"),
+        }) or db.companydocs.find_one({
+            "_id": object_id(doc_id),
+            "organizationId": regulation.get("organizationId"),
+        })
         if not doc:
             continue
 
@@ -68,6 +74,7 @@ def main():
             {"regulation_id": object_id(regulation_id), "doc_id": doc["_id"]},
             {
                 "$set": {
+                    "organizationId": regulation.get("organizationId"),
                     "regulation_id": object_id(regulation_id),
                     "doc_id": doc["_id"],
                     "relevance_score": entry["relevance_score"],
@@ -77,7 +84,7 @@ def main():
                     "old_text": first_change.get("old_text", ""),
                     "new_text": first_change.get("new_text", ""),
                     "policy_section": doc.get("name", ""),
-                    "status": "pending",
+                    "reviewStatus": "pending",
                 },
                 "$setOnInsert": {
                     "draft_amendment": "",

@@ -5,8 +5,13 @@ import Regulation from "../models/Regulation.js";
 import ImpactMapping from "../models/ImpactMapping.js";
 import { runAgent } from "../utils/runAgent.js";
 import { ensureDirectory, uploadsDir, reportsDir } from "../utils/paths.js";
+import authMiddleware from "../middleware/auth.js";
+import crypto from "crypto";
+import { createJob } from "../services/jobService.js";
+import { runPipeline } from "../jobs/pipelineOrchestrator.js";
 
 const router = express.Router();
+router.use(authMiddleware);
 
 ensureDirectory(uploadsDir);
 ensureDirectory(reportsDir);
@@ -19,7 +24,19 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype === "application/pdf") {
+    cb(null, true);
+  } else {
+    cb(new Error("Only PDF files are allowed"), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+});
 
 router.post("/upload", upload.single("file"), async (req, res, next) => {
   try {
@@ -32,55 +49,58 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
       return res.status(400).json({ message: "Source and title are required" });
     }
 
-    const monitor = await runAgent("monitor_agent.py", {
-      pdf_path: req.file.path,
-      source,
-      title,
-    });
+    // Generate idempotency hash based ONLY on file contents
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const hash = crypto.createHash("sha256");
+    hash.update(fileBuffer);
+    const fileHash = hash.digest("hex");
 
-    const regulationId = monitor.regulation_id;
+    // Check if job exists
+    let job = await createJob(
+      req.user.organizationId,
+      null, // we don't have regulationId yet
+      fileHash
+    );
 
-    await runAgent("parser_agent.py", {
+    let regulationId = job.regulationId;
+
+    if (job.status === "queued" && !regulationId) {
+      // Run monitor_agent synchronously because it's fast (just DB insert)
+      // and we need the regulationId for the response.
+      const monitor = await runAgent("monitor_agent.py", {
+        pdf_path: req.file.path,
+        source,
+        title,
+        organization_id: req.user.organizationId,
+      });
+
+      regulationId = monitor.regulation_id;
+
+      job.regulationId = regulationId;
+      await job.save();
+
+      // Start the background orchestrator for the rest of the pipeline
+      runPipeline(job._id, regulationId, req.file.path, company_name).catch(console.error);
+    }
+
+    return res.status(202).json({
+      jobId: job._id,
       regulation_id: regulationId,
-      pdf_path: req.file.path,
-    });
-
-    await runAgent("diff_agent.py", {
-      regulation_id: regulationId,
-    });
-
-    await runAgent("mapping_agent.py", {
-      regulation_id: regulationId,
-    });
-
-    await runAgent("drafting_agent.py", {
-      regulation_id: regulationId,
-    });
-
-    const reportPath = `${reportsDir}/${regulationId}.pdf`;
-    const report = await runAgent("report_agent.py", {
-      regulation_id: regulationId,
-      company_name,
-      output_path: reportPath,
-    });
-
-    await Regulation.findByIdAndUpdate(regulationId, {
-      status: "done",
-    });
-
-    res.json({
-      regulation_id: regulationId,
-      status: "done",
-      report_path: report.report_path,
+      status: job.status,
     });
   } catch (error) {
+    if (error.message === "Only PDF files are allowed") {
+      return res.status(400).json({ message: error.message });
+    }
     next(error);
   }
 });
 
 router.get("/", async (req, res, next) => {
   try {
-    const regulations = await Regulation.find().sort({
+    const regulations = await Regulation.find({
+      organizationId: req.user.organizationId,
+    }).sort({
       published_date: -1,
       createdAt: -1,
     });
@@ -92,12 +112,18 @@ router.get("/", async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const regulation = await Regulation.findById(req.params.id);
+    const regulation = await Regulation.findOne({
+      _id: req.params.id,
+      organizationId: req.user.organizationId,
+    });
     if (!regulation) {
       return res.status(404).json({ message: "Regulation not found" });
     }
 
-    const mappings = await ImpactMapping.find({ regulation_id: regulation._id })
+    const mappings = await ImpactMapping.find({
+      regulation_id: regulation._id,
+      organizationId: req.user.organizationId,
+    })
       .populate("doc_id")
       .sort({ relevance_score: -1 });
 
@@ -109,7 +135,10 @@ router.get("/:id", async (req, res, next) => {
 
 router.get("/:id/diff", async (req, res, next) => {
   try {
-    const regulation = await Regulation.findById(req.params.id).lean();
+    const regulation = await Regulation.findOne({
+      _id: req.params.id,
+      organizationId: req.user.organizationId,
+    }).lean();
     if (!regulation) {
       return res.status(404).json({ message: "Regulation not found" });
     }
@@ -122,7 +151,10 @@ router.get("/:id/diff", async (req, res, next) => {
 
 router.get("/:id/mappings", async (req, res, next) => {
   try {
-    const mappings = await ImpactMapping.find({ regulation_id: req.params.id })
+    const mappings = await ImpactMapping.find({
+      regulation_id: req.params.id,
+      organizationId: req.user.organizationId,
+    })
       .populate("doc_id")
       .sort({ relevance_score: -1 });
     res.json({ mappings });

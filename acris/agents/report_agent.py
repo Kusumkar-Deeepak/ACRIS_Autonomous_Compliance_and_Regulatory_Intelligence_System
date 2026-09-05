@@ -260,6 +260,7 @@ def main():
         pass
 
     db.reports.insert_one({
+        "organizationId": regulation.get("organizationId"),
         "regulation_ids": [object_id(regulation_id)],
         "generated_at": datetime.utcnow(),
         "pdf_path": output_path,

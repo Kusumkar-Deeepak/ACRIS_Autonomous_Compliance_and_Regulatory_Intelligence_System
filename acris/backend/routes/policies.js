@@ -2,8 +2,10 @@ import express from "express";
 import multer from "multer";
 import { runAgent } from "../utils/runAgent.js";
 import { ensureDirectory, uploadsDir } from "../utils/paths.js";
+import authMiddleware from "../middleware/auth.js";
 
 const router = express.Router();
+router.use(authMiddleware);
 
 ensureDirectory(uploadsDir);
 
@@ -28,6 +30,7 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
       name: req.body.name || req.file.originalname,
       type: req.body.type || "policy",
       owner_team: req.body.owner_team || "Compliance",
+      organization_id: req.user.organizationId,
     });
 
     res.status(201).json(result);

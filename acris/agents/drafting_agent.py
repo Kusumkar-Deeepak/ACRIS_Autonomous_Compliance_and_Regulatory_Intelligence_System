@@ -1,18 +1,32 @@
 from llm import try_generate
 from shared import emit_error, emit_json, get_db, object_id, read_input_json
+from prompts_registry import DRAFTING_AMENDMENT_V1
 
 
 def build_prompt(clause: str, old_text: str, new_text: str, policy_section: str, policy_text: str) -> str:
-    return (
-        "You are a compliance expert. A regulatory clause has changed.\n"
-        f"REGULATORY CLAUSE: {clause}\n\n"
-        f"OLD REGULATION:\n{old_text or 'N/A'}\n\n"
-        f"NEW REGULATION:\n{new_text or 'N/A'}\n\n"
-        f"CURRENT POLICY SECTION: {policy_section}\n\n"
-        f"POLICY TEXT:\n{policy_text}\n\n"
-        "Write a concise, professional amendment to update the policy section to comply with the new regulation. "
-        "Start with the section reference."
+    return DRAFTING_AMENDMENT_V1.format(
+        clause=clause,
+        old_text=old_text or 'N/A',
+        new_text=new_text or 'N/A',
+        policy_section=policy_section,
+        policy_text=policy_text
     )
+
+
+def validate_draft(draft: str, fallback: str) -> tuple[str, str]:
+    if not draft or draft == fallback:
+        return fallback, "fallback"
+        
+    draft = draft.strip()
+    # Check length constraints
+    if len(draft) < 10 or len(draft) > 2000:
+        return fallback, "fallback"
+        
+    # Check for leaked prompt text
+    if "You are a compliance expert" in draft or "REGULATORY CLAUSE:" in draft:
+        return fallback, "fallback"
+        
+    return draft, "llm"
 
 
 def main():
@@ -23,7 +37,7 @@ def main():
 
     db = get_db()
     mappings = list(
-        db.impactmappings.find({"regulation_id": object_id(regulation_id), "status": "pending"})
+        db.impactmappings.find({"regulation_id": object_id(regulation_id), "reviewStatus": "pending"})
         .sort("relevance_score", -1)
     )
 
@@ -50,11 +64,12 @@ def main():
             f"{doc.get('name', 'Policy Section')} (revised): Align the policy with the new regulatory clause "
             f"{related_change.get('clause', mapping.get('clause', ''))}."
         )
-        amendment_text = try_generate(prompt, fallback)
+        raw_amendment = try_generate(prompt, fallback)
+        amendment_text, draft_source = validate_draft(raw_amendment, fallback)
 
         db.impactmappings.update_one(
             {"_id": mapping["_id"]},
-            {"$set": {"draft_amendment": amendment_text, "status": "pending"}},
+            {"$set": {"draft_amendment": amendment_text, "reviewStatus": "pending", "draft_source": draft_source}},
         )
 
         drafts.append({

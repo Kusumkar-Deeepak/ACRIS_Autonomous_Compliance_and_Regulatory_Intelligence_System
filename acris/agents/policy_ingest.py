@@ -4,7 +4,7 @@ from pathlib import Path
 import fitz
 
 from chroma_store import embed_document
-from shared import emit_error, emit_json, get_db, normalize_text, read_input_json
+from shared import emit_error, emit_json, get_db, normalize_text, object_id, read_input_json
 
 
 def extract_text(pdf_path: str) -> str:
@@ -22,15 +22,19 @@ def main():
     name = payload.get("name")
     doc_type = payload.get("type", "policy")
     owner_team = payload.get("owner_team", "Compliance")
+    organization_id = payload.get("organization_id")
 
     if not pdf_path or not Path(pdf_path).exists():
         emit_error("Policy PDF not found", extra={"pdf_path": pdf_path})
     if not name:
         emit_error("Policy name is required")
+    if not organization_id:
+        emit_error("organization_id is required")
 
     content_text = extract_text(pdf_path)
     db = get_db()
     doc = db.companydocs.insert_one({
+        "organizationId": object_id(organization_id),
         "name": name,
         "type": doc_type,
         "content_text": content_text,

@@ -1,0 +1,120 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: acris-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: acris-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: acris-chroma
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: acris-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 20s
+      timeout: 10s
+      retries: 20
+
+  backend:
+    build:
+      context: ./acris/backend
+    container_name: acris-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/acris
+      REDIS_URL: redis://redis:6379
+      OLLAMA_BASE_URL: http://ollama:11434
+    ports:
+      - "5000:5000"
+    working_dir: /app
+    command: npm run dev
+
+  worker:
+    build:
+      context: ./acris/agents
+    container_name: acris-worker
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/acris
+      OLLAMA_BASE_URL: http://ollama:11434
+      REDIS_URL: redis://redis:6379
+    working_dir: /app
+    command: python -c "print('ACRIS worker container ready - queue implementation is the next phase')"
+
+  frontend:
+    build:
+      context: ./acris/frontend
+    container_name: acris-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "5173:5173"
+    working_dir: /app
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  mongo_data:
+  chroma_data:
+  ollama_data:
