@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { BrowserRouter } from "react-router-dom";
+import AppShell from "./AppShell.jsx";
 import Login from "../pages/Login.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
+import JobDetails from "../pages/JobDetails.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 
 function ProtectedRoute({ children }) {
@@ -39,10 +41,20 @@ function AppRouterContent() {
         path="/"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <Navigate to="/dashboard" replace />
           </ProtectedRoute>
         }
       />
+      <Route
+        element={
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/jobs/:jobId" element={<JobDetails />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

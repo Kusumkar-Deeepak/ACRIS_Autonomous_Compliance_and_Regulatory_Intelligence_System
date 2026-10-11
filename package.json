@@ -6,7 +6,8 @@
     "dev": "npm --prefix acris/backend run dev",
     "dev:frontend": "npm --prefix acris/frontend run dev",
     "build": "npm --prefix acris/frontend run build",
-    "lint": "npm --prefix acris/backend run lint",
-    "test": "npm --prefix acris/backend run test"
+    "lint": "npm --prefix acris/backend run lint && node scripts/run_python.js ruff check acris/agents",
+    "test": "npm --prefix acris/backend run test",
+    "test:py": "node scripts/run_python.js pytest acris/agents"
   }
 }

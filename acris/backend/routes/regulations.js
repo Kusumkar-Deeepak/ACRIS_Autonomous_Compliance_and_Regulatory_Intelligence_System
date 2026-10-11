@@ -59,7 +59,7 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
     let job = await createJob(
       req.user.organizationId,
       null, // we don't have regulationId yet
-      fileHash
+      fileHash,
     );
 
     let regulationId = job.regulationId;
@@ -80,7 +80,9 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
       await job.save();
 
       // Start the background orchestrator for the rest of the pipeline
-      runPipeline(job._id, regulationId, req.file.path, company_name).catch(console.error);
+      runPipeline(job._id, regulationId, req.file.path, company_name, req.user.organizationId).catch(
+        console.error,
+      );
     }
 
     return res.status(202).json({
@@ -143,7 +145,31 @@ router.get("/:id/diff", async (req, res, next) => {
       return res.status(404).json({ message: "Regulation not found" });
     }
 
-    res.json({ changes: regulation.changes || [] });
+    const changes = regulation.changes || [];
+    const previous = regulation.previousVersionId
+      ? await Regulation.findOne({
+          _id: regulation.previousVersionId,
+          organizationId: req.user.organizationId,
+        })
+      : null;
+    const counts = Object.fromEntries(
+      ["added", "modified", "removed", "renumbered", "unchanged"].map(
+        (type) => [
+          type,
+          changes.filter(
+            (change) => (change.change_type || change.changeType) === type,
+          ).length,
+        ],
+      ),
+    );
+
+    res.json({
+      changes,
+      counts,
+      fromVersion: previous?.version ?? null,
+      toVersion: regulation.version,
+      previousRegulationId: regulation.previousVersionId || null,
+    });
   } catch (error) {
     next(error);
   }

@@ -22,7 +22,11 @@ def main():
 
     db = get_db()
     latest = db.regulations.find_one(
-        {"organizationId": object_id(organization_id), "source": source, "title": title},
+        {
+            "organizationId": object_id(organization_id),
+            "source": source,
+            "regulationKey": f"{source}:{normalize_text(title).lower()}",
+        },
         sort=[("version", -1)],
     )
     version = (latest.get("version", 0) + 1) if latest else 1
@@ -31,6 +35,8 @@ def main():
         "organizationId": object_id(organization_id),
         "source": source,
         "title": normalize_text(title),
+        "regulationKey": f"{source}:{normalize_text(title).lower()}",
+        "previousVersionId": latest.get("_id") if latest else None,
         "published_date": datetime.now(timezone.utc),
         "pdf_url": pdf_path,
         "extracted_text": "",

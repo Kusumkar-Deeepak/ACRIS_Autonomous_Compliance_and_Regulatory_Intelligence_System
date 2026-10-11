@@ -1,8 +1,9 @@
 from pathlib import Path
 
 import fitz
+import os
 
-from shared import emit_error, emit_json, get_db, object_id, normalize_text, read_input_json
+from shared import emit_error, emit_json, get_db, object_id, read_input_json
 
 
 def extract_pdf_text(pdf_path: str) -> tuple[str, int]:
@@ -39,6 +40,9 @@ def main():
         emit_error("PDF file does not exist", extra={"pdf_path": pdf_path})
 
     text, pages = extract_pdf_text(pdf_path)
+    minimum_chars = int(os.getenv("MIN_EXTRACTED_CHARS", "20"))
+    if len(text) < minimum_chars:
+        emit_error("PDF extraction produced no usable text", extra={"code": "EMPTY_EXTRACTION"})
     word_count = len(text.split())
     db = get_db()
     db.regulations.update_one(

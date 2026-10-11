@@ -1,3 +1,31 @@
+[project]
+name = "acris-agents"
+version = "0.1.0"
+dependencies = [
+    "pymupdf==1.23.0",
+    "langchain==0.2.0",
+    "langchain-community==0.2.0",
+    "chromadb==0.5.0",
+    "reportlab==4.0.0",
+    "pymongo==4.6.0",
+    "python-dotenv==1.0.0",
+    "requests==2.31.0",
+    "pytest==8.0.0",
+    "pytest-mock==3.12.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.11.2"
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []
+
 [tool.black]
 line-length = 100
 target-version = ["py311"]
@@ -8,6 +36,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+ignore = ["E501", "I001", "W292", "W293"]
 
 [tool.pytest.ini_options]
 pythonpath = ["acris/agents"]

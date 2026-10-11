@@ -17,7 +17,7 @@ from reportlab.platypus import (
 )
 
 from llm import try_generate
-from shared import emit_error, emit_json, get_db, object_id, read_input_json, resolve_path
+from shared import emit_error, emit_json, get_db, object_id, read_input_json, resolve_path, scoped_find, scoped_find_one
 
 
 def chunk_text(value: str, max_chars: int = 520) -> list[str]:
@@ -98,6 +98,9 @@ def build_report_narrative(company_name: str, regulation: dict, mappings: list[d
             f"clauses: {', '.join(mapping.get('affected_clauses', [])) or 'None'}"
         )
 
+    change_preview_text = "\n".join(change_preview) if change_preview else "- No clause changes"
+    mapping_preview_text = "\n".join(mapping_preview) if mapping_preview else "- No mapped documents"
+
     summary_prompt = (
         "You are writing a short executive summary for a compliance dashboard for mixed technical and non-technical users. "
         "Write 3 to 4 simple sentences in plain English. Mention the risk level and immediate focus areas. "
@@ -108,9 +111,9 @@ def build_report_narrative(company_name: str, regulation: dict, mappings: list[d
         f"Total changes: {len(changes)}\n"
         f"Mapped policy docs: {len(mappings)}\n\n"
         "Top clause changes:\n"
-        f"{'\n'.join(change_preview) if change_preview else '- No clause changes'}\n\n"
+        f"{change_preview_text}\n\n"
         "Top impacted documents:\n"
-        f"{'\n'.join(mapping_preview) if mapping_preview else '- No mapped documents'}"
+        f"{mapping_preview_text}"
     )
 
     actions_prompt = (
@@ -121,7 +124,7 @@ def build_report_narrative(company_name: str, regulation: dict, mappings: list[d
         f"Total changes: {len(changes)}\n"
         f"Mapped docs: {len(mappings)}\n"
         "Top changes:\n"
-        f"{'\n'.join(change_preview) if change_preview else '- No clause changes'}"
+        f"{change_preview_text}"
     )
 
     summary_fallback = (
@@ -167,17 +170,36 @@ def main():
     payload = read_input_json()
     regulation_id = payload.get("regulation_id")
     company_name = payload.get("company_name", "Your Company")
+    organization_id = payload.get("organization_id")
     output_path = resolve_path(payload.get("output_path", f"./reports/{regulation_id}.pdf"))
 
     if not regulation_id:
         emit_error("regulation_id is required")
+    if not organization_id:
+        emit_error("organization_id is required")
 
     db = get_db()
-    regulation = db.regulations.find_one({"_id": object_id(regulation_id)})
+    regulation = scoped_find_one(db, "regulations", organization_id, {"_id": object_id(regulation_id)})
     if not regulation:
         emit_error("Regulation not found")
 
-    mappings = list(db.impactmappings.find({"regulation_id": object_id(regulation_id)}).sort("relevance_score", -1))
+    mappings = list(
+        scoped_find(db, "impactmappings", organization_id, {"regulation_id": object_id(regulation_id)})
+        .sort("relevance_score", -1)
+    )
+    for mapping in mappings:
+        policy_document_id = mapping.get("policyDocumentId") or mapping.get("doc_id")
+        policy_document = scoped_find_one(
+            db,
+            "companydocuments",
+            organization_id,
+            {"_id": policy_document_id},
+        )
+        if policy_document:
+            mapping["policy_section"] = policy_document.get(
+                "name",
+                mapping.get("policy_section", "Policy Document"),
+            )
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     narrative_summary, action_items = build_report_narrative(company_name, regulation, mappings)
 

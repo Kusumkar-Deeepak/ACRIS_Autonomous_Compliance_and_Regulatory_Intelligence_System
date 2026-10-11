@@ -8,34 +8,44 @@ if agents_dir not in sys.path:
     sys.path.append(agents_dir)
 
 from shared import get_db
-from chroma_store import embed_document, collection
+from chroma_store import collection, embed_chunks, get_embedding_model, get_embedding_version
 
 def main():
     print("Starting policy reindexing script...")
     db = get_db()
     
-    # First, let's clear the old collection.
-    # Note: ChromaDB might not have a simple truncate, so deleting all items by getting their IDs
-    print("Clearing old embeddings...")
-    existing_data = collection.get()
-    ids_to_delete = existing_data.get("ids", [])
-    if ids_to_delete:
-        collection.delete(ids=ids_to_delete)
-        print(f"Deleted {len(ids_to_delete)} old embeddings.")
-    else:
-        print("No old embeddings found.")
+    versions = list(db.companydocumentversions.find({"isCurrent": True}))
+    print(f"Found {len(versions)} current document versions to reindex.")
 
-    docs = list(db.companydocs.find({"content_text": {"$exists": True, "$ne": ""}}))
-    print(f"Found {len(docs)} documents to reindex.")
-    
-    for doc in docs:
-        doc_id = str(doc["_id"])
-        name = doc.get("name", "Untitled")
-        text = doc.get("content_text", "")
-        
-        print(f"Embedding document: {name} ({doc_id})")
-        # embed_document calls the currently configured EMBEDDING_PROVIDER
-        embed_document(doc_id=doc_id, doc_name=name, text=text)
+    for version in versions:
+        document = db.companydocuments.find_one({"_id": version["documentId"]})
+        if not document:
+            continue
+
+        chunks = list(db.documentchunks.find({"documentVersionId": version["_id"]}).sort("chunkIndex", 1))
+        vector_chunks = []
+        for chunk in chunks:
+            vector_chunks.append({
+                "text": chunk.get("text", ""),
+                "metadata": {
+                    "name": document.get("name", "Untitled"),
+                    "organizationId": str(document["organizationId"]),
+                    "documentId": str(document["_id"]),
+                    "documentVersionId": str(version["_id"]),
+                    "chunkId": str(chunk["_id"]),
+                    "chunkIndex": chunk.get("chunkIndex", 0),
+                    "section": chunk.get("section", ""),
+                    "page": chunk.get("page") if chunk.get("page") is not None else -1,
+                    "embeddingModel": get_embedding_model(),
+                    "embeddingVersion": get_embedding_version(),
+                    "isCurrentVersion": True,
+                },
+            })
+        embed_chunks(vector_chunks)
+        db.documentchunks.update_many(
+            {"documentVersionId": version["_id"]},
+            {"$set": {"embeddingModel": get_embedding_model(), "embeddingVersion": get_embedding_version()}},
+        )
 
     print("Reindexing complete!")
 

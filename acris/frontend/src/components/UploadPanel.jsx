@@ -50,7 +50,9 @@ function UploadPanel({ onUploaded }) {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setMessage(
-          "Policy indexed successfully. You can now run a regulation upload to see impacted sections.",
+          response.data?.is_new_version === false
+            ? `No change detected. Policy is already at version ${response.data.version_number}.`
+            : `Policy version ${response.data?.version_number || 1} indexed successfully. You can now run a regulation upload to see impacted sections.`,
         );
         await onUploaded?.(response.data);
       }

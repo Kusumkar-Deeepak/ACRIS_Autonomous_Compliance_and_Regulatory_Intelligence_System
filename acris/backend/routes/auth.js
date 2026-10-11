@@ -2,10 +2,11 @@ import express from "express";
 import authMiddleware from "../middleware/auth.js";
 import { authenticateUser, registerUser } from "../services/authService.js";
 import requireRole from "../middleware/requireRole.js";
+import loginRateLimit from "../middleware/loginRateLimit.js";
 
 const router = express.Router();
 
-router.post("/login", async (req, res, next) => {
+router.post("/login", loginRateLimit, async (req, res, next) => {
   try {
     const result = await authenticateUser(req.body || {});
     if (!result.ok) {

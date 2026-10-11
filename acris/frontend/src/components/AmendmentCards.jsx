@@ -18,6 +18,7 @@ function AmendmentCards({
         {(mappings || []).length ? (
           mappings.map((mapping) => {
             const reviewStatus = mapping.reviewStatus || "pending";
+            const lineageComplete = mapping.lineageComplete !== false;
             return (
               <div
                 key={mapping._id || mapping.doc_id}
@@ -30,6 +31,11 @@ function AmendmentCards({
                     </div>
                     <div className="mt-1 text-xs text-slate-400">
                       Status: {reviewStatus}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      {lineageComplete
+                        ? `Regulation v${mapping.regulationVersionNumber ?? mapping.regulationVersion ?? "?"} \u2192 policy "${mapping.doc_id?.name || mapping.policy_section || "Policy"}" v${mapping.policyVersionNumber ?? "?"}`
+                        : "Legacy recommendation \u2014 re-analysis required"}
                     </div>
                   </div>
                   <span
@@ -46,14 +52,14 @@ function AmendmentCards({
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
                     className="acris-button"
-                    disabled={pendingApprove || reviewStatus === "approved"}
+                    disabled={pendingApprove || reviewStatus === "approved" || !lineageComplete}
                     onClick={() => onApprove(mapping._id)}
                   >
                     Approve
                   </button>
                   <button
                     className="acris-button-secondary"
-                    disabled={pendingReject || reviewStatus === "rejected"}
+                    disabled={pendingReject || reviewStatus === "rejected" || !lineageComplete}
                     onClick={() => onReject(mapping._id)}
                   >
                     Reject

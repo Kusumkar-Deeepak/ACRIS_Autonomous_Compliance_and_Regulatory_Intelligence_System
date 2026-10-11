@@ -8,16 +8,26 @@ import amendmentRoutes from "./routes/amendments.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import jobRoutes from "./routes/jobs.js";
 import errorHandler from "./middleware/errorHandler.js";
-import { reportsDir, uploadsDir } from "./utils/paths.js";
+import { getHealth } from "./services/healthService.js";
+import securityHeaders from "./middleware/securityHeaders.js";
 
 export function createApp() {
   const app = express();
 
-  app.use(cors());
+  const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Origin is not allowed"));
+    },
+  }));
+  app.use(securityHeaders);
   app.use(express.json({ limit: "10mb" }));
-
-  app.use("/uploads", express.static(uploadsDir));
-  app.use("/reports", express.static(reportsDir));
 
   app.use("/api/auth", authRoutes);
   app.use("/api/regulations", regulationRoutes);
@@ -28,7 +38,11 @@ export function createApp() {
   app.use("/api/jobs", jobRoutes);
 
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    getHealth().then((health) => {
+      res.status(health.status === "ok" ? 200 : 503).json(health);
+    }).catch(() => {
+      res.status(503).json({ status: "degraded", dependencies: {} });
+    });
   });
 
   app.use(errorHandler);

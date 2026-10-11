@@ -38,7 +38,7 @@ function Login() {
                 pipeline.
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-                Phase 1 is built for local execution: PDF upload, parsing,
+                Phase 2 provides a routed workspace for PDF upload, parsing,
                 semantic diffing, policy mapping, draft amendments, and PDF
                 report generation. Use the dashboard to review every stage.
               </p>

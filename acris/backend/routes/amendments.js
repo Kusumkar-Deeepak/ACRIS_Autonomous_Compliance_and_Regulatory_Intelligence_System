@@ -1,5 +1,7 @@
 import express from "express";
 import ImpactMapping from "../models/ImpactMapping.js";
+import { AmendmentRepository } from "../repositories/amendmentRepository.js";
+import { AmendmentService } from "../services/amendmentService.js";
 import authMiddleware from "../middleware/auth.js";
 import requireRole from "../middleware/requireRole.js";
 import requireOrgAccess from "../middleware/requireOrgAccess.js";
@@ -7,19 +9,19 @@ import requireOrgAccess from "../middleware/requireOrgAccess.js";
 const router = express.Router();
 router.use(authMiddleware);
 
+const repository = new AmendmentRepository({ ImpactMapping });
+const amendmentService = new AmendmentService(repository);
+
 router.post(
   "/:id/approve",
   requireRole("manager", "admin"),
   requireOrgAccess({ Model: ImpactMapping, resourceName: "Amendment" }),
   async (req, res, next) => {
     try {
-      const updated = await ImpactMapping.findByIdAndUpdate(
+      const updated = await amendmentService.approve(
         req.params.id,
-        { reviewStatus: "approved", reviewed_by: req.user?.email || "admin" },
-        { new: true },
-      )
-        .populate("doc_id")
-        .populate("regulation_id");
+        req.user?.email || "admin",
+      );
 
       if (!updated) {
         return res.status(404).json({ message: "Amendment not found" });
@@ -38,13 +40,10 @@ router.post(
   requireOrgAccess({ Model: ImpactMapping, resourceName: "Amendment" }),
   async (req, res, next) => {
     try {
-      const updated = await ImpactMapping.findByIdAndUpdate(
+      const updated = await amendmentService.reject(
         req.params.id,
-        { reviewStatus: "rejected", reviewed_by: req.user?.email || "admin" },
-        { new: true },
-      )
-        .populate("doc_id")
-        .populate("regulation_id");
+        req.user?.email || "admin",
+      );
 
       if (!updated) {
         return res.status(404).json({ message: "Amendment not found" });

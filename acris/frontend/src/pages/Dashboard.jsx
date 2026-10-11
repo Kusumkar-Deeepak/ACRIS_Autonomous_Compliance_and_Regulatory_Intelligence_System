@@ -44,7 +44,7 @@ function statusTone(status) {
 }
 
 function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedRegulationId, setSelectedRegulationId] = useState("");
 
@@ -153,14 +153,13 @@ function Dashboard() {
     <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
       <header className="acris-card flex flex-col gap-4 p-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="acris-label">ACRIS Phase 1</p>
+          <p className="acris-label">ACRIS Phase 2</p>
           <h1 className="mt-2 font-display text-3xl text-white md:text-4xl">
             Compliance command center
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Upload a regulatory PDF, let the agents run synchronously, and
-            review clause diffs, impacted policies, draft amendments, and report
-            output in one place.
+            Upload a regulatory PDF, track processing, and review clause diffs,
+            impacted policies, draft amendments, and report output in one place.
           </p>
         </div>
 
@@ -173,9 +172,6 @@ function Dashboard() {
               {user?.name || "Compliance Admin"}
             </div>
           </div>
-          <button className="acris-button-secondary" onClick={logout}>
-            Log out
-          </button>
         </div>
       </header>
 
@@ -369,7 +365,12 @@ function Dashboard() {
           </article>
 
           <AgentTimeline status={selectedRegulation.status} />
-          <DiffViewer changes={changes} />
+          <DiffViewer
+            changes={changes}
+            fromVersion={diffQuery.data?.fromVersion ?? null}
+            toVersion={diffQuery.data?.toVersion ?? selectedRegulation?.version}
+            counts={diffQuery.data?.counts}
+          />
           <PolicyMappings mappings={mappings} />
           <AmendmentCards
             mappings={mappings}

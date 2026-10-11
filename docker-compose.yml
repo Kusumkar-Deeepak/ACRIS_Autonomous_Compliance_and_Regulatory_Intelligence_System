@@ -73,6 +73,7 @@ services:
       MONGODB_URI: mongodb://mongo:27017/acris
       REDIS_URL: redis://redis:6379
       OLLAMA_BASE_URL: http://ollama:11434
+      CHROMA_URL: http://chroma:8000
     ports:
       - "5000:5000"
     working_dir: /app
@@ -80,7 +81,8 @@ services:
 
   worker:
     build:
-      context: ./acris/agents
+      context: .
+      dockerfile: acris/agents/Dockerfile
     container_name: acris-worker
     restart: unless-stopped
     depends_on:
@@ -99,7 +101,7 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       REDIS_URL: redis://redis:6379
     working_dir: /app
-    command: python -c "print('ACRIS worker container ready - queue implementation is the next phase')"
+    command: python acris/agents/verify_redis.py
 
   frontend:
     build:

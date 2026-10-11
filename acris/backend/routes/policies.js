@@ -17,7 +17,20 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const fileFilter = (req, file, callback) => {
+  if (file.mimetype === "application/pdf") {
+    return callback(null, true);
+  }
+  const error = new Error("Only PDF files are allowed");
+  error.status = 415;
+  return callback(error, false);
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
 
 router.post("/upload", upload.single("file"), async (req, res, next) => {
   try {
@@ -35,7 +48,13 @@ router.post("/upload", upload.single("file"), async (req, res, next) => {
 
     res.status(201).json(result);
   } catch (error) {
-    next(error);
+    if (error.message === "Only PDF files are allowed") {
+      return res.status(415).json({ message: error.message });
+    }
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ message: "PDF must be 20 MB or smaller" });
+    }
+    return next(error);
   }
 });
 

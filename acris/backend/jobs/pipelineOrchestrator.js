@@ -3,7 +3,7 @@ import ComplianceJob from "../models/ComplianceJob.js";
 import Regulation from "../models/Regulation.js";
 import { reportsDir } from "../utils/paths.js";
 
-export async function runPipeline(jobId, regulationId, pdfPath, companyName) {
+export async function runPipeline(jobId, regulationId, pdfPath, companyName, organizationId) {
   try {
     // 1. Mark Job as running
     await ComplianceJob.findByIdAndUpdate(jobId, {
@@ -60,14 +60,30 @@ export async function runPipeline(jobId, regulationId, pdfPath, companyName) {
     await runStage("diff", "diff_agent.py", { regulation_id: regulationId }, "pending_map");
 
     // Mapping Agent
-    await runStage("mapping", "mapping_agent.py", { regulation_id: regulationId }, "pending_draft");
+    const agentContext = {
+      organization_id: organizationId,
+      job_id: jobId,
+      prompt_version: "drafting-amendment-v1",
+    };
+    await runStage("mapping", "mapping_agent.py", {
+      regulation_id: regulationId,
+      ...agentContext,
+    }, "pending_draft");
 
     // Drafting Agent
-    await runStage("drafting", "drafting_agent.py", { regulation_id: regulationId }, "pending_draft");
+    await runStage("drafting", "drafting_agent.py", {
+      regulation_id: regulationId,
+      ...agentContext,
+    }, "pending_draft");
 
     // Report Agent
     const reportPath = `${reportsDir}/${regulationId}.pdf`;
-    await runStage("report", "report_agent.py", { regulation_id: regulationId, company_name: companyName, output_path: reportPath }, "done");
+    await runStage("report", "report_agent.py", {
+      regulation_id: regulationId,
+      organization_id: organizationId,
+      company_name: companyName,
+      output_path: reportPath,
+    }, "done");
 
     // Job done
     await ComplianceJob.findByIdAndUpdate(jobId, {

@@ -6,7 +6,7 @@ const documentSyncJobSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organization",
       index: true,
-      default: null,
+      required: true,
     },
     documentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -38,5 +38,7 @@ const documentSyncJobSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+documentSyncJobSchema.index({ organizationId: 1, status: 1 });
 
 export default mongoose.model("DocumentSyncJob", documentSyncJobSchema);

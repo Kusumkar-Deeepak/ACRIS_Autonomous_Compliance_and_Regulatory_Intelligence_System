@@ -10,6 +10,12 @@ const regulationSchema = new mongoose.Schema(
     },
     source: { type: String, enum: ["RBI", "SEBI", "MCA"] },
     title: String,
+    regulationKey: { type: String, index: true },
+    previousVersionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Regulation",
+      default: null,
+    },
     published_date: { type: Date, default: Date.now },
     pdf_url: String,
     extracted_text: String,
@@ -27,9 +33,24 @@ const regulationSchema = new mongoose.Schema(
     changes: [
       {
         clause: String,
+        clauseId: String,
+        clauseNumber: String,
         old_text: String,
         new_text: String,
+        oldText: String,
+        newText: String,
         change_type: String,
+        changeType: String,
+        matchRatio: Number,
+        matchThreshold: Number,
+        fromVersion: Number,
+        toVersion: Number,
+        fromRegulationId: String,
+        toRegulationId: String,
+        oldClauseNumber: String,
+        newClauseNumber: String,
+        detectionMethod: String,
+        summary: String,
       },
     ],
   },
@@ -37,5 +58,6 @@ const regulationSchema = new mongoose.Schema(
 );
 
 regulationSchema.index({ organizationId: 1, source: 1, title: 1, version: 1 });
+regulationSchema.index({ organizationId: 1, regulationKey: 1, version: 1 });
 
 export default mongoose.model("Regulation", regulationSchema);

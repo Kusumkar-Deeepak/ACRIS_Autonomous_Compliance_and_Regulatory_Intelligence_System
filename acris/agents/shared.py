@@ -82,26 +82,69 @@ def split_clauses(text: str) -> list[dict]:
         clause_label = clause_match.group(1).rstrip(":") if clause_match else f"Clause {index}"
         clauses.append({
             "clause": normalize_text(clause_label),
+            "clause_number": normalize_text(clause_label),
             "text": normalize_text(block)
         })
 
     if not clauses and normalized.strip():
-        clauses.append({"clause": "Clause 1", "text": normalize_text(normalized)})
+        clauses.append({"clause": "Clause 1", "clause_number": "Clause 1", "text": normalize_text(normalized)})
 
     return clauses
 
 
-def best_match(target_text: str, candidates: list[dict]) -> dict | None:
+def match_threshold() -> float:
+    configured = os.getenv("DIFF_MATCH_THRESHOLD", "0.45")
+    try:
+        value = float(configured)
+    except ValueError:
+        value = 0.45
+    return max(0.0, min(1.0, value))
+
+
+def best_match_with_score(target_text: str, candidates: list[dict], threshold: float | None = None) -> tuple[dict | None, float]:
     if not candidates:
-        return None
+        return None, 0.0
     target = normalize_text(target_text)
     scored = []
     for candidate in candidates:
         score = SequenceMatcher(None, target.lower(), normalize_text(candidate["text"]).lower()).ratio()
         scored.append((score, candidate))
     scored.sort(key=lambda item: item[0], reverse=True)
-    return scored[0][1] if scored and scored[0][0] > 0.45 else None
+    threshold = match_threshold() if threshold is None else threshold
+    if not scored or scored[0][0] <= threshold:
+        return None, scored[0][0] if scored else 0.0
+    return scored[0][1], scored[0][0]
+
+
+def best_match(target_text: str, candidates: list[dict], threshold: float | None = None) -> dict | None:
+    return best_match_with_score(target_text, candidates, threshold)[0]
 
 
 def object_id(value: str):
     return ObjectId(value)
+
+
+def scoped_find_one(db, collection_name: str, organization_id, query: dict):
+    if not organization_id:
+        raise ValueError("organizationId is required for scoped queries")
+    scoped_query = {**query, "organizationId": object_id(organization_id)
+                    if isinstance(organization_id, str) else organization_id}
+    return db[collection_name].find_one(scoped_query)
+
+
+def scoped_find(db, collection_name: str, organization_id, query: dict):
+    if not organization_id:
+        raise ValueError("organizationId is required for scoped queries")
+    scoped_query = {**query, "organizationId": object_id(organization_id)
+                    if isinstance(organization_id, str) else organization_id}
+    return db[collection_name].find(scoped_query)
+
+
+def require_matching_organization(db, collection_name: str, resource_id, organization_id):
+    resource = db[collection_name].find_one({"_id": object_id(resource_id)})
+    if not resource:
+        raise ValueError(f"{collection_name} not found")
+    expected = object_id(organization_id) if isinstance(organization_id, str) else organization_id
+    if resource.get("organizationId") != expected:
+        raise ValueError("organizationId does not match persisted resource")
+    return resource

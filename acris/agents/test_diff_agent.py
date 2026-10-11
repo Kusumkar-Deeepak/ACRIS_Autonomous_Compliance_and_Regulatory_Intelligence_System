@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Import the processing functions from diff_agent
 import diff_agent
@@ -36,7 +36,7 @@ class TestDiffAgent(unittest.TestCase):
                 try:
                     result = future.result()
                     changes.append(result)
-                except Exception as e:
+                except Exception:
                     # In main() we catch and pass.
                     pass
 

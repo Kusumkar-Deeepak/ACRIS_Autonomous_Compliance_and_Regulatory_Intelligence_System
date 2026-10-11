@@ -6,7 +6,7 @@ const documentChangeEventSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organization",
       index: true,
-      default: null,
+      required: true,
     },
     documentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -27,10 +27,12 @@ const documentChangeEventSchema = new mongoose.Schema(
     },
     sourceVersionId: { type: String, default: "" },
     contentHash: { type: String, default: "" },
-    occurredAt: { type: Date, default: Date.now },
+    detectedAt: { type: Date, default: Date.now },
     handledAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
+
+documentChangeEventSchema.index({ organizationId: 1, documentId: 1, detectedAt: 1 });
 
 export default mongoose.model("DocumentChangeEvent", documentChangeEventSchema);

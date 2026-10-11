@@ -38,7 +38,7 @@ export function runAgent(scriptName, inputJSON) {
 
       try {
         resolve(JSON.parse(stdout));
-      } catch (error) {
+      } catch {
         reject(new Error(`Agent output not valid JSON: ${stdout || stderr}`));
       }
     });

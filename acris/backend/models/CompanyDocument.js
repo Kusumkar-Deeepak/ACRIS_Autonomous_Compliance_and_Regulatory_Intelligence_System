@@ -6,7 +6,7 @@ const companyDocumentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organization",
       index: true,
-      default: null,
+      required: true,
     },
     name: { type: String, required: true, trim: true },
     documentType: { type: String, default: "policy" },
@@ -38,5 +38,16 @@ companyDocumentSchema.index({
   source: 1,
   externalDocumentId: 1,
 });
+companyDocumentSchema.index({ organizationId: 1, name: 1 }, { unique: true });
+companyDocumentSchema.index(
+  { organizationId: 1, sourceType: 1, externalDocumentId: 1 },
+  {
+    unique: true,
+    sparse: true,
+    partialFilterExpression: {
+      externalDocumentId: { $type: "string", $gt: "" },
+    },
+  },
+);
 
 export default mongoose.model("CompanyDocument", companyDocumentSchema);
